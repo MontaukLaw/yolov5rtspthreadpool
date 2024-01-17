@@ -2,7 +2,7 @@
 
 #include "preprocess.h"
 
-#include "utils/logging.h"
+#include "logging.h"
 #include "im2d.h"
 #include "rga.h"
 

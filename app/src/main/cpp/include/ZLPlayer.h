@@ -13,11 +13,13 @@
 #include "rga_utils.h"
 #include "mpp_decoder.h"
 #include "yolov5_thread_pool.h"
+#include "display_queue.h"
 
-typedef struct {
+typedef struct g_rknn_app_context_t {
     FILE *out_fp;
     MppDecoder *decoder;
     Yolov5ThreadPool *yolov5ThreadPool;
+    RenderFrameQueue *renderFrameQueue;
     // MppEncoder *encoder;
     // mk_media media;
     // mk_pusher pusher;
@@ -31,22 +33,6 @@ typedef struct {
 
 } rknn_app_context_t;
 
-typedef struct g_frame_data_t {
-    char *data;
-    long dataSize;
-    int screenStride;
-    int screenW;
-    int screenH;
-    int widthStride;
-    int heightStride;
-    int frameId;
-    int frameFormat;
-} frame_data_t;
-
-#endif //AIBOX_ZLPLAYER_H
-
-using namespace std::chrono;
-
 class ZLPlayer {
 
 private:
@@ -57,17 +43,17 @@ private:
     char *modelFileContent = 0;
     int modelFileSize = 0;
 
-    steady_clock::time_point nextRendTime;
+    std::chrono::steady_clock::time_point nextRendTime;
 
 public:
     // static RenderCallback renderCallback;
     rknn_app_context_t app_ctx;
     // char *rtsp_url = "rtsp://192.168.1.10:554/stream1";
-    // char *rtsp_url = "rtsp://192.168.1.159:554/stream1";
-    char *rtsp_url = "rtsp://192.168.1.155:554/stream1";
+    char *rtsp_url = "rtsp://192.168.1.159:554/stream1";
+    // char *rtsp_url = "rtsp://192.168.1.155:554/stream1";
 
     // ZLPlayer(const char *data_source, JNICallbackHelper *helper);
-    ZLPlayer();
+    ZLPlayer(char *modelFileData, int modelDataLen);
 
     ~ZLPlayer();
 
@@ -84,3 +70,5 @@ public:
 
     void get_detect_result();
 };
+
+#endif //AIBOX_ZLPLAYER_H

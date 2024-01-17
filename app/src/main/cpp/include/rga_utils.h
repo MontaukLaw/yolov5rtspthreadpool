@@ -10,6 +10,7 @@
 #include "util.h"
 #include <unistd.h>
 #include <malloc.h>
+#include "log4c.h"
 
 struct LetterBoxInfo {
     bool hor;

@@ -10,14 +10,13 @@ set(MPP ${CMAKE_SOURCE_DIR}/mpp)
 set(RGA ${CMAKE_SOURCE_DIR}/rga)
 
 include_directories(${CMAKE_SOURCE_DIR}/include)  # 导入include文件夹
+include_directories(${CMAKE_SOURCE_DIR}/task)
 include_directories(${RKNN}/include)  # 导入rknn的头文件
 include_directories(${FFMPEG}/include)  # 导入ffmpeg的头文件
 include_directories(${OPENCV}/include)
 include_directories(${MPP}/include)
 include_directories(${RGA}/include)
-
 include_directories(${CMAKE_SOURCE_DIR}/types)
-include_directories(${CMAKE_SOURCE_DIR}/task)
 include_directories(${CMAKE_SOURCE_DIR}/process)
 include_directories(${CMAKE_SOURCE_DIR}/engine)
 include_directories(${CMAKE_SOURCE_DIR}/draw)
@@ -33,7 +32,7 @@ set(OPENSSL_ROOT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../../../libs/${ANDROID_ABI}")
 find_package(OpenCV 4.8 REQUIRED java)
 
 # 记得修改路径
-set(ZLMediaKit_Root "D:\\ZLMediaKit")
+set(ZLMediaKit_Root "C:\\ZLMediaKit")
 set(JNI_Root ${CMAKE_CURRENT_SOURCE_DIR})
 
 # 添加主工程cmake
@@ -67,11 +66,22 @@ add_library(${CMAKE_PROJECT_NAME} SHARED
         ${cpp_src_file}
         task/yolov5.cpp
         task/yolov5_thread_pool.cpp
-        engine/rknn_engine.cpp)
+        engine/rknn_engine.cpp
+        rkmedia/utils/mpp_decoder.cpp
+        rkmedia/utils/drawing.cpp
+        process/preprocess.cpp
+        process/yolov5_postprocess.cpp
+        )
 
 target_link_libraries(${CMAKE_PROJECT_NAME}
         -Wl,--start-group android ${log-lib} z ${MK_LINK_LIBRARIES} -Wl,--end-group
         ${OpenCV_LIBS}
         android
         log
+        ${MPP}/libs/${ANDROID_ABI}/libmpp.so
+        ${RGA}/libs/${ANDROID_ABI}/librga.so
+        ${RKNN}/libs/${ANDROID_ABI}/librknnrt.so
+
+        mk_api # 在mpp_libs下，ZLMediaKit API库
+
         )

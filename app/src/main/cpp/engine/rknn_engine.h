@@ -16,6 +16,7 @@ public:
     RKEngine() : rknn_ctx_(0), ctx_created_(false), input_num_(0), output_num_(0){}; // 构造函数，初始化
     ~RKEngine() override;                                                            // 析构函数
 
+    nn_error_e LoadModelData(char *modelData, int dataSize) override;
     nn_error_e LoadModelFile(const char *model_file) override;                                                         // 加载模型文件
     const std::vector<tensor_attr_s> &GetInputShapes() override;                                                       // 获取输入张量的形状
     const std::vector<tensor_attr_s> &GetOutputShapes() override;                                                      // 获取输出张量的形状

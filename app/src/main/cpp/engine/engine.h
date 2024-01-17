@@ -19,7 +19,8 @@ public:
     virtual const std::vector<tensor_attr_s> &GetInputShapes() = 0;                                                      // 获取输入张量的形状
     virtual const std::vector<tensor_attr_s> &GetOutputShapes() = 0;                                                     // 获取输出张量的形状
     virtual nn_error_e Run(std::vector<tensor_data_s> &inputs, std::vector<tensor_data_s> &outpus, bool want_float) = 0; // 运行模型
-    
+    virtual nn_error_e LoadModelData(char *modelData, int dataSize) = 0;
+
 };
 
 std::shared_ptr<NNEngine> CreateRKNNEngine(); // 创建RKNN引擎

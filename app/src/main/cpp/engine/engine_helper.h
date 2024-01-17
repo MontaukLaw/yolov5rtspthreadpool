@@ -155,8 +155,8 @@ static void rknn_output_to_tensor_data(const rknn_output &output, tensor_data_s 
 {
     data.attr.index = output.index;
     data.attr.size = output.size;
-    NN_LOG_DEBUG("output size: %d", output.size);
-    NN_LOG_DEBUG("output want_float: %d", output.want_float);
+    // NN_LOG_DEBUG("output size: %d", output.size);
+    // NN_LOG_DEBUG("output want_float: %d", output.want_float);
     memcpy(data.data, output.buf, output.size);
 }
 

@@ -39,33 +39,40 @@ void ZLPlayer::setModelFile(char *data, int dataLen) {
     this->modelFileSize = dataLen;
 }
 
-ZLPlayer::ZLPlayer() {
+ZLPlayer::ZLPlayer(char *modelFileData, int modelDataLen) {
 
-    this->data_source = new char[strlen(data_source) + 1];
-    strcpy(this->data_source, data_source); // 把源 Copy给成员
-    this->isStreaming = false;
+    // this->data_source = new char[strlen(data_source) + 1];
+    // strcpy(this->data_source, data_source); // 把源 Copy给成员
+    // this->isStreaming = false;
+
+    this->modelFileSize = modelDataLen;
+    this->modelFileContent = (char *) malloc(modelDataLen);
+    memcpy(this->modelFileContent, modelFileData, modelDataLen);
 
     LOGD("create mpp");
-
     // 创建上下文
     memset(&app_ctx, 0, sizeof(rknn_app_context_t)); // 初始化上下文
     // app_ctx.job_cnt = 1;
     // app_ctx.result_cnt = 1;
     // app_ctx.mppDataThreadPool = new MppDataThreadPool();
-
     // yolov8_thread_pool = new Yolov8ThreadPool(); // 创建线程池
     // yolov8_thread_pool->setUpWithModelData(20, this->modelFileContent, this->modelFileSize);
     app_ctx.yolov5ThreadPool = new Yolov5ThreadPool(); // 创建线程池
+    app_ctx.yolov5ThreadPool->setUpWithModelData(20, this->modelFileContent, this->modelFileSize);
+
     // app_ctx.mppDataThreadPool->setUpWithModelData(THREAD_POOL, this->modelFileContent, this->modelFileSize);
 
     // yolov8_thread_pool->setUp(model_path, 12);   // 初始化线程池
 
     // MPP 解码器
     if (app_ctx.decoder == nullptr) {
+        LOGD("create decoder");
         MppDecoder *decoder = new MppDecoder();           // 创建解码器
-        decoder->Init(264, 25, &app_ctx);          // 初始化解码器
+        decoder->Init(264, 25, &app_ctx);                 // 初始化解码器
         decoder->SetCallback(mpp_decoder_frame_callback); // 设置回调函数，用来处理解码后的数据
         app_ctx.decoder = decoder;                        // 将解码器赋值给上下文
+    } else {
+        LOGD("decoder is not null");
     }
     // 启动rtsp线程
     pthread_create(&pid_rtsp, nullptr, rtps_process, this);
@@ -183,32 +190,32 @@ void ZLPlayer::display() {
     // frameDataPtr->data = nullptr;
 
     // 设置下一次执行的时间点
-    nextRendTime = steady_clock::now() + milliseconds(30);
+    nextRendTime = std::chrono::steady_clock::now() + std::chrono::milliseconds(30);
 
 }
 
 void ZLPlayer::get_detect_result() {
-    std::vector <Detection> objects;
+    std::vector<Detection> objects;
     // LOGD("decoder_callback Getting result count :%d", app_ctx.result_cnt);
     auto ret_code = app_ctx.yolov5ThreadPool->getTargetResultNonBlock(objects, app_ctx.result_cnt);
     if (ret_code == NN_SUCCESS) {
 
-        // auto frameData = ;
-        app_ctx.yolov5ThreadPool->getTargetImgResult(app_ctx.result_cnt);
-
+        uint8_t idx;
+        for (idx = 0; idx < objects.size(); idx++) {
+            LOGD("objects[%d].classId: %d\n", idx, objects[idx].class_id);
+            LOGD("objects[%d].prop: %f\n", idx, objects[idx].confidence);
+            LOGD("objects[%d].class name: %s\n", idx, objects[idx].className.c_str());
+        }
+        auto frameData = app_ctx.yolov5ThreadPool->getTargetImgResult(app_ctx.result_cnt);
         app_ctx.result_cnt++;
         LOGD("Get detect result counter:%d start display", app_ctx.result_cnt);
-
         // 加入队列
         // app_ctx.renderFrameQueue->push(frameData);
 
         // renderFrame((uint8_t *) frameData->data, frameData->screenW, frameData->screenH, frameData->screenStride);
-
         // 释放内存
-        // delete frameData->data;
-        // frameData->data = nullptr;
-
-        // app_ctx.renderFrameQueue->push(frameData);
+        delete frameData->data;
+        frameData->data = nullptr;
 
     } else if (NN_RESULT_NOT_READY == ret_code) {
         // LOGD("decoder_callback wait for result ready");
@@ -227,7 +234,8 @@ int ZLPlayer::process_video_rtsp() {
     mk_player_play(player, rtsp_url);
 
     while (1) {
-        // usleep(1000);
+        // sleep(1);
+        // LOGD("Running");
         // display();
         // display();
         get_detect_result();
@@ -361,23 +369,25 @@ void ZLPlayer::mpp_decoder_frame_callback(void *userdata, int width_stride, int 
 
     frameData->frameId = ctx->job_cnt;
     int detectPoolSize = ctx->yolov5ThreadPool->get_task_size();
-
     LOGD("detectPoolSize :%d", detectPoolSize);
 
     // ctx->mppDataThreadPool->submitTask(frameData);
     // ctx->job_cnt++;
     // 如果frameData->frameId为奇数
     ctx->frame_cnt++;
-    if (ctx->frame_cnt % 2 == 1) {
-        // if (detectPoolSize < MAX_TASK) {
-        // 放入线程池, 进行并行推理
-        ctx->mppDataThreadPool->submitTask(frameData);
-        ctx->job_cnt++;
-    } else {
-        // 直接释放
-        delete frameData->data;
-        frameData->data = nullptr;
-    }
+    ctx->yolov5ThreadPool->submitTask(frameData);
+    ctx->job_cnt++;
+
+    //    if (ctx->frame_cnt % 2 == 1) {
+    //        // if (detectPoolSize < MAX_TASK) {
+    //        // 放入线程池, 进行并行推理
+    //        ctx->yolov5ThreadPool->submitTask(frameData);
+    //        ctx->job_cnt++;
+    //    } else {
+    //        // 直接释放
+    //        delete frameData->data;
+    //        frameData->data = nullptr;
+    //    }
 
 }
 

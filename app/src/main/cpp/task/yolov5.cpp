@@ -93,6 +93,52 @@ nn_error_e Yolov5::LoadModel(const char *model_path) {
     return NN_SUCCESS;
 }
 
+
+
+// 加载模型，获取输入输出属性
+nn_error_e Yolov5::LoadModelWithData(char *modelData, int modelSize) {
+    auto ret = engine_->LoadModelData(modelData, modelSize);
+    if (ret != NN_SUCCESS) {
+        NN_LOG_ERROR("yolo load model file failed");
+        return ret;
+    }
+    // get input tensor
+    auto input_shapes = engine_->GetInputShapes();
+
+    // check number of input and n_dims
+    if (input_shapes.size() != 1) {
+        NN_LOG_ERROR("yolo input tensor number is not 1, but %ld", input_shapes.size());
+        return NN_RKNN_INPUT_ATTR_ERROR;
+    }
+    nn_tensor_attr_to_cvimg_input_data(input_shapes[0], input_tensor_);
+    input_tensor_.data = malloc(input_tensor_.attr.size);
+
+    auto output_shapes = engine_->GetOutputShapes();
+
+    for (int i = 0; i < output_shapes.size(); i++) {
+        tensor_data_s tensor;
+        tensor.attr.n_elems = output_shapes[i].n_elems;
+        tensor.attr.n_dims = output_shapes[i].n_dims;
+        for (int j = 0; j < output_shapes[i].n_dims; j++) {
+            tensor.attr.dims[j] = output_shapes[i].dims[j];
+        }
+        // output tensor needs to be float32
+        if (output_shapes[i].type != NN_TENSOR_INT8) {
+            NN_LOG_ERROR("yolo output tensor type is not int8, but %d", output_shapes[i].type);
+            return NN_RKNN_OUTPUT_ATTR_ERROR;
+        }
+        tensor.attr.type = output_shapes[i].type;
+        tensor.attr.index = i;
+        tensor.attr.size = output_shapes[i].n_elems * nn_tensor_type_to_size(tensor.attr.type);
+        tensor.data = malloc(tensor.attr.size);
+        output_tensors_.push_back(tensor);
+        out_zps_.push_back(output_shapes[i].zp);
+        out_scales_.push_back(output_shapes[i].scale);
+    }
+    return NN_SUCCESS;
+}
+
+
 // 图像预处理
 nn_error_e Yolov5::Preprocess(const cv::Mat &img, const std::string process_type, cv::Mat &image_letterbox) {
 
@@ -143,6 +189,53 @@ nn_error_e Yolov5::Run(const cv::Mat &img, std::vector <Detection> &objects) {
     return NN_SUCCESS;
 
 }
+
+nn_error_e Yolov5::RunWithFrameData(const std::shared_ptr <frame_data_t> frameData, std::vector <Detection> &objects) {
+    // letterbox后的图像
+    cv::Mat image_letterbox;
+    rga_buffer_t origin;
+    struct timeval start, end;
+    gettimeofday(&start, NULL);
+
+    int inputWidth = frameData->widthStride;
+    int inputHeight = frameData->heightStride;
+
+    // LOGD("RunWithFrameData inputWidth :%d inputHeight:%d", inputWidth, inputHeight);
+    // im_rect src_rect;
+    // memset(&src_rect, 0, sizeof(src_rect));
+    // rga_letter_box(&origin, frameData->data, inputWidth, inputHeight, frameData->frameFormat, &letterbox_info_.hor, &letterbox_info_.pad);
+
+    origin = wrapbuffer_virtualaddr((void *) frameData->data, inputWidth, inputHeight, frameData->frameFormat);
+    cv::Mat origin_mat = cv::Mat::zeros(inputHeight, inputWidth, CV_8UC3);
+    // 先转成cv matrix
+    rga_buffer_t rgb_img = wrapbuffer_virtualaddr((void *) origin_mat.data, inputWidth, inputHeight, RK_FORMAT_RGB_888);
+    imcopy(origin, rgb_img);
+
+    // destroy frameData;
+    // LOGD("RunWithFrameData Start preprocess");
+    // 预处理，支持opencv或rga
+    Preprocess(origin_mat, "opencv", image_letterbox);
+
+    // LOGD("RunWithFrameData Start inference");
+    // 不可以用rga, 不然直接硬件嗝屁了.
+    // Preprocess(origin_mat, "rga", image_letterbox);
+    // 推理
+    Inference();
+    // LOGD("RunWithFrameData Start post-process");
+    // 后处理
+    Postprocess(image_letterbox, objects);
+
+    // LOGD("RunWithFrameData letterbox_decode");
+    // letterbox_decode(objects, letterbox_info_.hor, letterbox_info_.pad);
+
+    // LOGD("RunWithFrameData End post-process");
+    gettimeofday(&end, NULL);
+    // LOGD("RunWithFrameData time cost: %ld ms", (end.tv_sec - start.tv_sec) * 1000 + (end.tv_usec - start.tv_usec) / 1000);
+
+    return NN_SUCCESS;
+
+}
+
 
 void letterbox_decode(std::vector <Detection> &objects, bool hor, int pad) {
     for (auto &obj: objects) {
