@@ -41,6 +41,10 @@ public:
     nn_error_e getTargetResultNonBlock(std::vector <Detection> &objects, int id);
 
     nn_error_e getTargetImgResult(int id);
+    
+    int get_task_size() {
+        return tasks.size();
+    }
 };
 
 #endif // RK3588_DEMO_YOLOV5_THREAD_POOL_H
